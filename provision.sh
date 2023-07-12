@@ -334,7 +334,7 @@ printf '%s\n' "Commiting uci changes and wrapping up"
 sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
 uci commit
 EOI
-printf '%s\n' "About to change root pwd for $(hostname)"
+printf '%s\n' "About to change root pwd"
 ssh root@192.168.1.1 passwd
 printf '%s\n' "All done, about to ssh back in to reboot openwrt"
 ssh -T root@192.168.1.1 reboot
