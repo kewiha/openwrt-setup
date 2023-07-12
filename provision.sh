@@ -64,6 +64,9 @@ case "$board_id" in
 	"dlink,dir-867-a1")
 		board_tested=true
 		;;
+        "dlink,dir-882-a1")
+                board_tested=true
+                ;;
 	*)
 		board_tested=false
 		;;
@@ -310,6 +313,13 @@ elif [[ "$board_id" == "dlink,dir-867-a1" && "$firstMAC" == "f6168da64f313b5a63f
 	uci set wireless.radio1.channel='44'
 EOI
 	#Do not indent EOI. Causes issues.
+elif [[ "$board_id" == "dlink,dir-882-a1" && "$firstMAC" == "cc6d054aaf40b90e75c64ae18159c2784c5c27c526e58289dc1018f7585d7d33  -" ]] ; then
+        sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
+        uci set system.@system[0].hostname='DIR882'
+        uci set wireless.radio0.channel='11'
+        uci set wireless.radio1.channel='149'
+EOI
+        #Do not indent EOI. Causes issues.
 else
 	printf '%s\n' "ERROR: board_id and firstMAC combination are unknown. Configure script for your board & settings before running."
 	exit 1
