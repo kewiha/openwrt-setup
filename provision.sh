@@ -130,30 +130,26 @@ if [[ "$(uci show | grep "network.\@device\[0\].ports" | grep wan)" == "" ]] ; t
 fi
 
 uci add network bridge-vlan >> /dev/null
-	#If copying this line from LuCi, it will have a comment with the auto generated ID of the bridge
-	#Consider removing the comment (i.e. everything after #) to prevent future confusion
-	#Added redirection to /dev/null to quiet output
+uci set network.@bridge-vlan[-1].device='br-lan'
+uci set network.@bridge-vlan[-1].vlan='1'
+uci add_list network.@bridge-vlan[-1].ports='wan:u*'
+
+uci add network bridge-vlan >> /dev/null
 uci set network.@bridge-vlan[-1].device='br-lan'
 uci set network.@bridge-vlan[-1].vlan='100'
 uci add_list network.@bridge-vlan[-1].ports='wan:t'
+
 uci add network bridge-vlan >> /dev/null
-	#If copying this line from LuCi, it will have a comment with the auto generated ID of the bridge
-	#Consider removing the comment (i.e. everything after #) to prevent future confusion
-	#Added redirection to /dev/null to quiet output
 uci set network.@bridge-vlan[-1].device='br-lan'
 uci set network.@bridge-vlan[-1].vlan='200'
 uci add_list network.@bridge-vlan[-1].ports='wan:t'
+
 uci add network bridge-vlan >> /dev/null
-	#If copying this line from LuCi, it will have a comment with the auto generated ID of the bridge
-	#Consider removing the comment (i.e. everything after #) to prevent future confusion
-	#Added redirection to /dev/null to quiet output
 uci set network.@bridge-vlan[-1].device='br-lan'
 uci set network.@bridge-vlan[-1].vlan='300'
 uci add_list network.@bridge-vlan[-1].ports='wan:t'
+
 uci add network bridge-vlan >> /dev/null
-	#If copying this line from LuCi, it will have a comment with the auto generated ID of the bridge
-	#Consider removing the comment (i.e. everything after #) to prevent future confusion
-	#Added redirection to /dev/null to quiet output
 uci set network.@bridge-vlan[-1].device='br-lan'
 uci set network.@bridge-vlan[-1].vlan='400'
 uci add_list network.@bridge-vlan[-1].ports='lan1:u*'
@@ -162,12 +158,17 @@ uci add_list network.@bridge-vlan[-1].ports='lan3:u*'
 uci add_list network.@bridge-vlan[-1].ports='lan4:u*'
 uci add_list network.@bridge-vlan[-1].ports='wan:t'
 
+
+uci set network.LAN=interface
+uci set network.LAN.proto='dhcp'
+uci set network.LAN.device='br-lan.1'
+uci set network.LAN.delegate='0'
 uci set network.KLAN=interface
-uci set network.KLAN.proto='dhcp'
+uci set network.KLAN.proto='none'
 uci set network.KLAN.device='br-lan.100'
 uci set network.KLAN.delegate='0'
 uci set network.KWLAN=interface
-uci set network.KWLAN.proto='dhcp'
+uci set network.KWLAN.proto='none'
 uci set network.KWLAN.device='br-lan.200'
 uci set network.KWLAN.delegate='0'
 uci set network.IOT=interface
@@ -249,7 +250,8 @@ uci set wireless.default_radio1.wnm_sleep_mode_no_keys='1'
 uci set wireless.wifinet2.wnm_sleep_mode_no_keys='1'
 
 #802.11w (needs fancy hostapd/wpad), could break roaming
-uci set wireless.default_radio0.ieee80211w='2'
+uci set wireless.default_radio0.ieee80211w='0'
+#802.11w optional or required (1 or 2, respectively) can prevent old or crappy clients from connecting
 uci set wireless.default_radio1.ieee80211w='2'
 uci set wireless.wifinet2.ieee80211w='2'
 
@@ -334,7 +336,7 @@ printf '%s\n' "Commiting uci changes and wrapping up"
 sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
 uci commit
 EOI
-printf '%s\n' "About to change root pwd"
+printf '%s\n' "About to change root pwd for $board_id: $firstMAC"
 ssh root@192.168.1.1 passwd
 printf '%s\n' "All done, about to ssh back in to reboot openwrt"
 ssh -T root@192.168.1.1 reboot
