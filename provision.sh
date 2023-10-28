@@ -251,12 +251,12 @@ uci set wireless.wifinet2.wnm_sleep_mode_no_keys='1'
 
 #802.11w (needs fancy hostapd/wpad), could break roaming
 	#802.11w optional or required (1 or 2, respectively) can prevent old or crappy clients from connecting
-        	#chromecast requires 0 or 1
+        	#chromecast requires 0 (appears to work with 1, but casting doesn't work properly)
         	#old wifi printer requires 0
         	#oldish homekit wifi thermostat requires 0
 uci set wireless.default_radio0.ieee80211w='0'
 uci set wireless.default_radio1.ieee80211w='2'
-uci set wireless.wifinet2.ieee80211w='1'
+uci set wireless.wifinet2.ieee80211w='0'
 
 #Inactivity
 uci set wireless.default_radio0.disassoc_low_ack='0'
