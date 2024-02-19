@@ -33,3 +33,6 @@ The following commonly used OpenWRT features have been disabled, which may be pr
   * Contains setup for sensitive info like wifi passwords. Not included. Should be placed in a subfolder "SECRET" wrt provision.sh
 * provision_secrets_censored_example.sh
   * A censored example of provision_secrets.sh. Create the SECRET subfolder, customize this file, move it into the SECRET subfolder, then rename it to provision_secrets.sh
+
+## Bugs
+* May have issue with devices on different VLANs communicating with each other (i.e. traffic doesn't get sent from openwrt back to the upstream router, then send back to openwrt on a different VLAN). Haven't diagnosed this adequately, and could be an issue with non-openwrt gear.
