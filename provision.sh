@@ -67,6 +67,9 @@ case "$board_id" in
         "dlink,dir-882-a1")
                 board_tested=true
                 ;;
+	"dlink,dir-1960-a1")
+                board_tested=true
+                ;;
 	*)
 		board_tested=false
 		;;
@@ -321,6 +324,13 @@ EOI
 elif [[ "$board_id" == "dlink,dir-882-a1" && "$firstMAC" == "cc6d054aaf40b90e75c64ae18159c2784c5c27c526e58289dc1018f7585d7d33  -" ]] ; then
         sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
         uci set system.@system[0].hostname='DIR882'
+        uci set wireless.radio0.channel='11'
+        uci set wireless.radio1.channel='149'
+EOI
+        #Do not indent EOI. Causes issues.
+elif [[ "$board_id" == "dlink,dir-1960-a1" && "$firstMAC" == "031aa1796dda3ad330512accf740f47fdca32ab07750fce551fecef3bfb7e0cb  -" ]] ; then
+        sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
+        uci set system.@system[0].hostname='DIR1960'
         uci set wireless.radio0.channel='11'
         uci set wireless.radio1.channel='149'
 EOI
