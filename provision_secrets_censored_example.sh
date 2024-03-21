@@ -78,7 +78,7 @@ elif [[ "$board_id" == "dlink,dir-1960-a1" && "$firstMAC" == "031aa1796dda3ad330
         uci set wireless.default_radio0.ssid='My1stRadioSSID'
 EOI
         #Do not indent EOI. Causes issues.
-else
-        printf '%s\n' "ERROR: board_id and firstMAC combination are unknown. Configure script for your board & settings before running."
-        exit 1
+#else
+#        printf '%s\n' "ERROR: board_id and firstMAC combination are unknown. Configure script for your board & settings before running."
+#        exit 1
 fi

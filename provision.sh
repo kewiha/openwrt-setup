@@ -11,14 +11,14 @@
 	#This script modifies your ~/.ssh/known_hosts file
 	#Can be run on a windows OS via WSL2 as long as the WSL2 VM can reach 192.168.1.1 via ssh
 
-################################################################
-printf '%s\n' "Clearing 192.168.1.1 from ~/.ssh/authorized_keys"
-################################################################
+########################################################################
+printf '%s\n' "### Clearing 192.168.1.1 from ~/.ssh/authorized_keys ###"
+########################################################################
 ssh-keygen -f ~/.ssh/known_hosts -R "192.168.1.1"
 
-#########################################
-printf '%s\n' "Get board_id and firstMAC"
-#########################################
+#################################################
+printf '%s\n' "### Get board_id and firstMAC ###"
+#################################################
 board_id="$(sshpass -p "" ssh -o StrictHostKeyChecking=no -T root@192.168.1.1 grep '\"id\":\ ' /etc/board.json | sed 's;\"\,.*;;' | sed 's;.*\";;')"
 firstMAC="$(sshpass -p "" ssh -T root@192.168.1.1 ip addr show | grep link/ether | head -n 1 | awk '{print $2}' | sha256sum)"
 	#Stored and compared as sha256sum
@@ -30,10 +30,9 @@ if [[ "$board_id" == "" ]] || [[ "$firstMAC" == "" ]] ; then
 	exit 1
 fi
 
-#######################################################
-printf '%s\n' "Decide which deployment settings to use"
-#######################################################
-
+###############################################################
+printf '%s\n' "### Decide which deployment settings to use ###"
+###############################################################
 if [[ ("$board_id" == "dlink,dir-1935-a1" && "$firstMAC" == "2f2d078888c469b9fd22500225f65b2825c09d143e5958e170401993885bc800  -") \
    || ("$board_id" == "dlink,dir-867-a1"  && "$firstMAC" == "f6168da64f313b5a63f3c23b67ac56f2f202d258758deee5d82abc3ac35b60b1  -") \
    || ("$board_id" == "dlink,dir-882-a1"  && "$firstMAC" == "cc6d054aaf40b90e75c64ae18159c2784c5c27c526e58289dc1018f7585d7d33  -") \
@@ -91,7 +90,7 @@ printf '%s\n' "### First big batch of commands ###"
 sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
 
 ################################
-printf '%s\n' "Getting board id"
+printf '%s\n' "#Getting board id"
 board_id="$(grep "\"id\":\ " /etc/board.json | sed 's;\"\,.*;;' | sed 's;.*\";;')"
 if [[ "$(printf '%s\n' $board_id | wc -l)" != "1" ]] ; then
 	printf '%s\n' "ERROR in provision.sh: Failed to get board id from /etc/board.json"
@@ -126,7 +125,7 @@ if [[ "$board_tested" != "true" ]] ; then
 fi
 
 ######################################
-printf '%s\n' "Generic non-uci config"
+printf '%s\n' "#Generic non-uci config"
 if [[ -f /etc/sysctl.conf ]] ; then
         if [[ "$(cat /etc/sysctl.conf | sed 's;.*\#.*;;' | grep -v -e '^$' | wc -l)" != "0" ]] ; then
                 printf '%s\n' "WARN: non-comment lines in sysctl.conf should not exist on a fresh install. Overwriting it"
@@ -147,7 +146,7 @@ printf '%s\n' "net.ipv6.conf.default.forwarding=0" >> /etc/sysctl.conf
 		#Other changes will probably be needed and aren't detailed.
 
 #########################################
-printf '%s\n' "Generic uci system config"
+printf '%s\n' "#Generic uci system config"
 uci revert system
 
 #Time
@@ -163,7 +162,7 @@ if [[ "$deployment" == "home.lan" ]]; then
 fi
 
 ##########################################
-printf '%s\n' "Generic uci network config"
+printf '%s\n' "#Generic uci network config"
 uci revert network
 
 #This block reassigns the wan port to the main/LAN bridge.
@@ -176,7 +175,7 @@ fi
 if [[ "$(uci show | grep '^network.wan.*')" != "" ]] ; then
 	uci delete network.wan
 fi
-if [[ "$WAN_on_separate_interface" == "false" ]]; then
+if [[ "$deployment" == "home.lan" ]]; then
 	if [[ "$(uci show | grep "network.\@device\[0\].ports" | grep wan)" == "" ]] ; then
 		uci add_list network.@device[0].ports='wan'
 	fi
@@ -232,11 +231,15 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set network.MLAN.device='br-lan.400'
 	uci del network.lan
 elif [[ "$deployment" == "rob.lan" ]]; then
-	uci set dhcp.lan.ignore='1'
+        uci set network.LAN=interface
         uci set network.LAN.proto='dhcp'
+        uci set network.LAN.device='br-lan'
+        uci set network.LAN.delegate='0'
+        uci del network.lan
 fi
 
-### Radio settings ###
+#######################################
+printf '%s\n' "#Wireless Radio Settings"
 uci revert wireless
 uci set wireless.radio0.channel='auto' #May be overriden later
 uci set wireless.radio1.channel='auto' #May be overriden later
@@ -248,12 +251,13 @@ uci set wireless.radio1.country='CA'
 if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.radio0.cell_density='0'
 	uci set wireless.radio1.cell_density='3'
-elif [[ "$deployment == "rob.lan" ]]; then
+elif [[ "$deployment" == "rob.lan" ]]; then
 	uci set wireless.radio0.cell_density='3'
 	uci set wireless.radio1.cell_density='3'
 fi
 
-### Wifi Network Settings ###
+#####################################
+printf '%s\n' "#Wifi Network Settings"
 #Create new wifi network(s) if needed
 if [[ "$deployment" == "home.lan" ]]; then
         uci set wireless.wifinet2=wifi-iface
@@ -303,7 +307,6 @@ if [[ "$deployment" == "home.lan" ]]; then
         uci set wireless.default_radio0.dtim_period='1'
 elif [[ "$deployment" == "rob.lan" ]]; then
         uci set wireless.default_radio0.dtim_period='3'
-
 fi
 uci set wireless.default_radio1.dtim_period='3'
 if [[ "$deployment" == "home.lan" ]]; then
@@ -398,7 +401,7 @@ uci del wireless.radio1.disabled
 
 
 #########################################################
-printf '%s\n' "Generic uci misc config"
+printf '%s\n' "#Generic uci misc config"
 if [[ "$(uci show | grep -i uhttpd)" != "" ]] ; then
         uci set uhttpd.main.redirect_https='on'
 fi
@@ -471,13 +474,21 @@ else
 	printf '%s\n' "ERROR in provision.sh: board_id and firstMAC combination are unknown. Configure script for your board & settings before running."
 	exit 1
 fi
-############################################
-printf '%s\n' "Calling provision_secrets.sh"
+####################################################
+printf '%s\n' "### Calling provision_secrets.sh ###"
+####################################################
 "$(dirname "${BASH_SOURCE[0]}")/SECRET/provision_secrets.sh"
 
-###########################
-printf '%s\n' "Commiting uci changes and wrapping up"
-###########################
+####################################################
+printf '%s\n' "### Printing pending uci changes ###"
+####################################################
+sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
+uci changes
+EOI
+
+#############################################################
+printf '%s\n' "### Commiting uci changes and wrapping up ###"
+#############################################################
 sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
 uci commit
 EOI
