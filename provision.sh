@@ -289,6 +289,15 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.wifinet2.encryption='psk2+ccmp'
 fi
 
+#802.11v Wifi Time Advertisement
+if [[ "$deployment" == "home.lan" ]]; then
+	uci set wireless.default_radio1.time_advertisement='2'
+	uci set wireless.wifinet2.time_advertisement='2'
+
+	uci set wireless.default_radio1.time_zone='EST5EDT,M3.2.0,M11.1.0'
+	uci set wireless.wifinet2.time_zone='EST5EDT,M3.2.0,M11.1.0'
+fi
+
 #DTIM period
 if [[ "$deployment" == "home.lan" ]]; then
         uci set wireless.default_radio0.dtim_period='1'
@@ -373,8 +382,8 @@ fi
 #Inactivity
 if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.default_radio0.disassoc_low_ack='0'
-	uci set wireless.default_radio1.disassoc_low_ack='0'
-	uci set wireless.wifinet2.disassoc_low_ack='0'
+#	uci set wireless.default_radio1.disassoc_low_ack='0'
+#	uci set wireless.wifinet2.disassoc_low_ack='0'
 fi
 
 #KRACK mitigation
