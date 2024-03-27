@@ -23,7 +23,7 @@ board_id="$(sshpass -p "" ssh -o StrictHostKeyChecking=no -T root@192.168.1.1 gr
 firstMAC="$(sshpass -p "" ssh -T root@192.168.1.1 ip addr show | grep link/ether | head -n 1 | awk '{print $2}' | sha256sum)"
 	#Stored and compared as sha256sum
 
-if [[ "$board_id" == "" ]] || [[ "$firstMAC" == "" ]] ; then
+if [[ "$board_id" == "" || "$firstMAC" == "" ]] ; then
 	printf '%s\n' "ERROR in provision.sh: Was not able to get board_id and/or firstMAC via ssh"
 	printf '%s\n' "board_id: $board_id"
 	printf '%s\n' "firstMAC: $firstMAC"
@@ -59,14 +59,20 @@ elif [[ ("$board_id" == "tplink,archer-c7-v4" && "$firstMAC" == "01acfe236ec6089
 	#Wifi roaming disabled
 
 	deployment="rob.lan"
+	#deployment="rob.lan.noroam"
 else
         printf '%s\n' "ERROR in provision.sh: board_id and firstMAC combination are unknown. Configure script for your board & settings before running."
         exit 1
 fi
 
+if [[ "$deployment" == "" ]]; then
+        printf '%s\n' "ERROR: deployment is blank (outside of openwrt ssh session)"
+        exit 1
+fi
+
 ##########################################################
 printf '%s\n' "### Check/install desired version wpad if needed ###"
-if [[ "$deployment" == "home.lan" ]]; then
+if [[ "$deployment" == "home.lan" || "$deployment" == "rob.lan" ]]; then
 	sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
 	wpad_package="wpad-openssl"
 	wpad_installed="$(opkg list-installed | grep wpad | awk '{print $1}')"
@@ -88,6 +94,14 @@ fi
 printf '%s\n' "### First big batch of commands ###"
 ###################################################
 sshpass -p "" ssh -T root@192.168.1.1 <<\EOI
+
+	#FIX LATER
+        deployment="rob.lan"
+
+if [[ "$deployment" == "" ]]; then
+	printf '%s\n' "ERROR: deployment is blank (inside openwrt ssh session)"
+	exit 1
+fi
 
 ################################
 printf '%s\n' "#Getting board id"
@@ -153,7 +167,7 @@ uci revert system
 uci set system.@system[0].zonename='America/Toronto'
 uci set system.@system[0].timezone='EST5EDT,M3.2.0,M11.1.0'
 if [[ "$deployment" == "home.lan" ]]; then
-	#Custom NTP server list (defaults should be ok)
+	#Custom NTP server list (defaults should be ok, these changes are optional)
 	uci del system.ntp.enabled
 	uci del system.ntp.enable_server
 	uci add_list system.ntp.server='10.0.0.1'
@@ -166,9 +180,7 @@ printf '%s\n' "#Generic uci network config"
 uci revert network
 
 #This block reassigns the wan port to the main/LAN bridge.
-#If you're using openwrt as a router, you will probably want to change code that modifies:
-	#uci network*: can omit entirely if you aren't using VLANs
-	#uci wireless.*.network: change value to 'lan' if you aren't using VLANs with your wifi networks
+#Probably only works on boards where WAN and LAN ports are on the same physical interface.
 if [[ "$(uci show | grep '^network.wan6.*')" != "" ]] ; then
         uci delete network.wan6
 fi
@@ -181,7 +193,12 @@ if [[ "$deployment" == "home.lan" ]]; then
 	fi
 fi
 
+printf '%s\n' "about to do a thing $deployment"
 if [[ "$deployment" == "home.lan" ]]; then
+        printf '%s\n' "$deployment: editing LAN proto et al"
+	#This block creates VLAN bridges and assigns them to WAN/LAN ports
+		#WAN: untagged for VLAN 1, tagged for the rest
+		#LAN: untagged for VLAN 400
 	uci add network bridge-vlan >> /dev/null
 	uci set network.@bridge-vlan[-1].device='br-lan'
 	uci set network.@bridge-vlan[-1].vlan='1'
@@ -211,6 +228,7 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci add_list network.@bridge-vlan[-1].ports='lan4:u*'
 	uci add_list network.@bridge-vlan[-1].ports='wan:t'
 
+	#This block creates networks on the bridges, makes openwrt request an ip addr on VLAN1
 	uci set network.LAN=interface
 	uci set network.LAN.proto='dhcp'
 	uci set network.LAN.device='br-lan.1'
@@ -230,12 +248,16 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set network.MLAN.proto='none'
 	uci set network.MLAN.device='br-lan.400'
 	uci del network.lan
-elif [[ "$deployment" == "rob.lan" ]]; then
-        uci set network.LAN=interface
-        uci set network.LAN.proto='dhcp'
-        uci set network.LAN.device='br-lan'
-        uci set network.LAN.delegate='0'
-        uci del network.lan
+elif [[ "$deployment" == "rob.lan" || "$deployment" == "rob.lan.noroam" ]]; then
+	printf '%s\n' "$deployment: editing LAN proto et al"
+	uci del dhcp.lan.ra_slaac
+	uci del dhcp.lan.ra
+	uci del dhcp.lan.ra_flags
+	uci del dhcp.lan.dhcpv6
+	uci del network.lan.ipaddr
+	uci del network.lan.netmask
+	uci del network.lan.ip6assign
+	uci set network.lan.proto='dhcp'
 fi
 
 #######################################
@@ -251,7 +273,7 @@ uci set wireless.radio1.country='CA'
 if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.radio0.cell_density='0'
 	uci set wireless.radio1.cell_density='3'
-elif [[ "$deployment" == "rob.lan" ]]; then
+elif [[ "$deployment" == "rob.lan" || "$deployment" == "rob.lan.noroam" ]]; then
 	uci set wireless.radio0.cell_density='3'
 	uci set wireless.radio1.cell_density='3'
 fi
@@ -294,18 +316,19 @@ if [[ "$deployment" == "home.lan" ]]; then
 fi
 
 #802.11v Wifi Time Advertisement
+uci set wireless.default_radio0.time_advertisement='2'
+uci set wireless.default_radio1.time_advertisement='2'
+uci set wireless.default_radio0.time_zone='EST5EDT,M3.2.0,M11.1.0'
+uci set wireless.default_radio1.time_zone='EST5EDT,M3.2.0,M11.1.0'
 if [[ "$deployment" == "home.lan" ]]; then
-	uci set wireless.default_radio1.time_advertisement='2'
 	uci set wireless.wifinet2.time_advertisement='2'
-
-	uci set wireless.default_radio1.time_zone='EST5EDT,M3.2.0,M11.1.0'
 	uci set wireless.wifinet2.time_zone='EST5EDT,M3.2.0,M11.1.0'
 fi
 
 #DTIM period
 if [[ "$deployment" == "home.lan" ]]; then
         uci set wireless.default_radio0.dtim_period='1'
-elif [[ "$deployment" == "rob.lan" ]]; then
+elif [[ "$deployment" == "rob.lan" || "$deployment" == "rob.lan.noroam" ]]; then
         uci set wireless.default_radio0.dtim_period='3'
 fi
 uci set wireless.default_radio1.dtim_period='3'
@@ -314,7 +337,7 @@ if [[ "$deployment" == "home.lan" ]]; then
 fi
 
 #Reassociation deadline
-if [[ "$deployment" == "home.lan" ]]; then
+if [[ "$deployment" == "home.lan" || "$deployment" == "rob.lan" ]]; then
 	uci set wireless.default_radio1.reassociation_deadline='20000'
 	uci set wireless.wifinet2.reassociation_deadline='20000'
 fi
@@ -333,6 +356,18 @@ if [[ "$deployment" == "home.lan" ]]; then
 
         uci set wireless.default_radio1.ft_psk_generate_local='1'
         uci set wireless.wifinet2.ft_psk_generate_local='1'
+elif [[ "$deployment" == "rob.lan" ]]; then
+        uci set wireless.default_radio0.ieee80211r='1'
+        uci set wireless.default_radio1.ieee80211r='1'
+
+        uci set wireless.default_radio0.mobility_domain='123A'
+        uci set wireless.default_radio0.mobility_domain='123B'
+
+        uci set wireless.default_radio0.ft_over_ds='0'
+        uci set wireless.default_radio1.ft_over_ds='0'
+
+        uci set wireless.default_radio0.ft_psk_generate_local='1'
+        uci set wireless.default_radio1.ft_psk_generate_local='1'
 fi
 
 #802.11k: BSS transitions (needs fancy hostapd/wpad?)
@@ -340,22 +375,9 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.default_radio0.ieee80211k='0'
 	uci set wireless.default_radio1.ieee80211k='1'
 	uci set wireless.wifinet2.ieee80211k='1'
-fi
-
-#802.11r: Fast BSS transition
-if [[ "$deployment" == "home.lan" ]]; then
-        uci set wireless.default_radio0.ieee80211r='0'
-        uci set wireless.default_radio1.ieee80211r='1'
-        uci set wireless.wifinet2.ieee80211r='1'
-
-        uci set wireless.default_radio1.mobility_domain='123D'
-        uci set wireless.wifinet2.mobility_domain='123F'
-
-        uci set wireless.default_radio1.ft_over_ds='0'
-        uci set wireless.wifinet2.ft_over_ds='0'
-
-        uci set wireless.default_radio1.ft_psk_generate_local='1'
-        uci set wireless.wifinet2.ft_psk_generate_local='1'
+elif [[ "$deployment" == "rob.lan" ]]; then
+        uci set wireless.default_radio0.ieee80211k='1'
+        uci set wireless.default_radio1.ieee80211k='1'
 fi
 
 #802.11v: Network Assisted Power Savings/Roaming (needs fancy hostapd/wpad)
@@ -369,6 +391,13 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.default_radio0.wnm_sleep_mode_no_keys='1'
 	uci set wireless.default_radio1.wnm_sleep_mode_no_keys='1'
 	uci set wireless.wifinet2.wnm_sleep_mode_no_keys='1'
+elif [[ "$deployment" == "rob.lan" ]]; then
+        uci set wireless.default_radio0.bss_transition='1'
+        uci set wireless.default_radio1.bss_transition='1'
+        uci set wireless.default_radio0.wnm_sleep_mode='1'
+        uci set wireless.default_radio1.wnm_sleep_mode='1'
+        uci set wireless.default_radio0.wnm_sleep_mode_no_keys='1'
+        uci set wireless.default_radio1.wnm_sleep_mode_no_keys='1'
 fi
 
 #802.11w: Protected Management Frames (needs fancy hostapd/wpad, could break roaming)
@@ -380,6 +409,9 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.default_radio0.ieee80211w='0'
 	uci set wireless.default_radio1.ieee80211w='2'
 	uci set wireless.wifinet2.ieee80211w='0'
+elif [[ "$deployment" == "rob.lan" ]]; then
+        uci set wireless.default_radio0.ieee80211w='0'
+        uci set wireless.default_radio1.ieee80211w='0'
 fi
 
 #Inactivity
@@ -396,6 +428,8 @@ if [[ "$deployment" == "home.lan" ]]; then
 	uci set wireless.wifinet2.wpa_disable_eapol_key_retries='1'
 fi
 
+#Enable wifi if disabled
+printf '%s\n' "Enabling wifi, ignore 2 messages about Entry not found"
 uci del wireless.radio0.disabled
 uci del wireless.radio1.disabled
 
