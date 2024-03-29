@@ -265,15 +265,22 @@ printf '%s\n' "#Wireless Radio Settings"
 uci revert wireless
 uci set wireless.radio0.channel='auto' #May be overriden later
 uci set wireless.radio1.channel='auto' #May be overriden later
-uci set wireless.radio0.htmode='HT40'
-uci set wireless.radio1.htmode='VHT40'
 uci set wireless.radio0.country='CA'
 uci set wireless.radio1.country='CA'
+
 #Cell coverage density: higher value = higher minimum data rates, lower compatibility
 if [[ "$deployment" == "home.lan" ]]; then
+	uci set wireless.radio0.htmode='HT40'
+		#Better to do HT40?
+
+	uci set wireless.radio1.htmode='VHT40'
+
 	uci set wireless.radio0.cell_density='0'
 	uci set wireless.radio1.cell_density='3'
 elif [[ "$deployment" == "rob.lan" || "$deployment" == "rob.lan.noroam" ]]; then
+	uci set wireless.radio0.htmode='VHT40'
+	uci set wireless.radio1.htmode='HT20'
+
 	uci set wireless.radio0.cell_density='3'
 	uci set wireless.radio1.cell_density='3'
 fi
