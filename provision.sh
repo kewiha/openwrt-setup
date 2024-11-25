@@ -270,8 +270,7 @@ uci set wireless.radio1.country='CA'
 
 #Cell coverage density: higher value = higher minimum data rates, lower compatibility
 if [[ "$deployment" == "home.lan" ]]; then
-	uci set wireless.radio0.htmode='HT40'
-		#Better to do HT40?
+	uci set wireless.radio0.htmode='HT20'
 
 	uci set wireless.radio1.htmode='VHT40'
 
