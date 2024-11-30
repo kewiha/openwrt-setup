@@ -367,7 +367,7 @@ elif [[ "$deployment" == "rob.lan" ]]; then
         uci set wireless.default_radio1.ieee80211r='1'
 
         uci set wireless.default_radio0.mobility_domain='123A'
-        uci set wireless.default_radio0.mobility_domain='123B'
+        uci set wireless.default_radio1.mobility_domain='123B'
 
         uci set wireless.default_radio0.ft_over_ds='0'
         uci set wireless.default_radio1.ft_over_ds='0'
